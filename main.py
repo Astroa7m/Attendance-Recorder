@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import openpyxl
 import os
 from colorist import red, effect_underline, Color, effect_bold
@@ -39,8 +41,14 @@ while True:
             section_number = filename[10:13]
 
             # opening the file and activating the current sheet
-            wb = openpyxl.load_workbook(os.path.join(directory, filename))
-            sheet = wb.active
+            try:
+                wb = openpyxl.load_workbook(os.path.join(directory, filename))
+                sheet = wb.active
+            except PermissionError:
+                red("Error while Opening files: Please make sure attendance files are closed while taking the "
+                    "attendance")
+                quit(-1)
+
 
             # this indicator used to exit the loops once student's id is found and marked attended
             # it is useful to immediately save the changes once the id found to avoid redundancy
@@ -79,8 +87,11 @@ while True:
             if changeMade:
                 # saving the file and resetting the counter, so it doesn't reach 4
                 # indicating that student's id was found and changes has been made
-                wb.save(os.path.join(directory, filename))
-                notFoundCounter = 0
+                try:
+                    wb.save(os.path.join(directory, filename))
+                    notFoundCounter = 0
+                except PermissionError:
+                    red(f"Error while Saving files: {name} ({target_id}) was not recorded as an attendee, please make sure attendance files are closed while taking the attendance")
                 break
             else:
                 # if the id is not found within a file then it will be incremented
@@ -100,12 +111,31 @@ def formatRecord(currentIndex):
            f" {recorded_students[currentIndex][2]} "
 
 
+def checkTempFileAvailability():
+    """Creates the temp file within the directory if it doesn't exist and returns its path"""
+    file_path = os.path.join(directory, "temp")
+    if not os.path.exists(file_path):
+        os.makedirs(file_path)
+    return file_path
+
+
 def writeRecordToFile():
     """Saving information recorded in recorded_students list into a file in case of corruption & checking"""
-    with open(os.path.join(directory + "\\temp", f"Week {target_week}.txt"), 'w') as f:
+
+    path = checkTempFileAvailability()
+
+    # construct the file name without invalid characters
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+    file_name = f"Week_{target_week}_{timestamp}.txt"
+
+    with open(os.path.join(path, file_name), 'w') as f:
         for index in range(len(recorded_students)):
             f.write(formatRecord(index) + "\n")
 
+
+# removing duplicates
+recorded_students = list(set(recorded_students))
 
 # displaying how many students where recorded and saving info into a file
 if recorded_students:
